@@ -76,20 +76,28 @@
 
   /* Qualifiers — shown after score, contextual */
   .qual-section { margin-bottom:1.5rem; }
-  .qual-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
-  @media (max-width:640px) { .qual-grid { grid-template-columns:1fr; } }
-  .qual-card { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:16px; transition:border-color 0.15s, background 0.15s; }
+  .qual-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:540px) { .qual-grid { grid-template-columns:1fr; } }
+  .qual-card {
+    background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px; transition:border-color 0.15s, background 0.15s;
+    display:flex; flex-direction:column; justify-content:space-between; min-height:130px;
+  }
   .qual-card.q-red    { border-color:var(--red-border);   background:var(--red-bg); }
   .qual-card.q-amber  { border-color:var(--amber-border); background:var(--amber-bg); }
   .qual-card.q-green  { border-color:var(--green-border); background:var(--green-bg); }
-  .qual-name { font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px; }
-  .qual-desc { font-size:11px; color:var(--text3); line-height:1.45; margin-bottom:12px; }
-  .qual-btns { display:flex; gap:6px; flex-wrap:wrap; }
-  .qual-btn { flex:1; min-width:50px; padding:7px 8px; border:0.5px solid var(--border2); border-radius:var(--radius-sm); background:var(--surface); color:var(--text2); font-size:12px; font-family:inherit; cursor:pointer; text-align:center; transition:all 0.15s; }
+  .qual-name { font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; }
+  .qual-desc { font-size:11px; color:var(--text3); line-height:1.45; margin-bottom:14px; flex:1; }
+  .qual-btns { display:flex; gap:8px; }
+  .qual-btn {
+    flex:1; padding:9px 12px; border:0.5px solid var(--border2); border-radius:var(--radius-sm);
+    background:var(--surface); color:var(--text2); font-size:13px; font-family:inherit;
+    cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap;
+  }
   .qual-btn:hover { background:var(--surface2); }
-  .qual-btn.q-active-yes  { background:var(--green-bg);  border-color:var(--green-border); color:var(--green-text);  font-weight:500; }
-  .qual-btn.q-active-no   { background:var(--red-bg);    border-color:var(--red-border);   color:var(--red-text);    font-weight:500; }
-  .qual-btn.q-active-part { background:var(--amber-bg);  border-color:var(--amber-border); color:var(--amber-text);  font-weight:500; }
+  .qual-btn.q-active-yes  { background:var(--green-bg);  border-color:var(--green-border); color:var(--green-text);  font-weight:600; }
+  .qual-btn.q-active-no   { background:var(--red-bg);    border-color:var(--red-border);   color:var(--red-text);    font-weight:600; }
+  .qual-btn.q-active-part { background:var(--amber-bg);  border-color:var(--amber-border); color:var(--amber-text);  font-weight:600; }
 
   /* Result */
   .result-panel { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:1.5rem; }
@@ -149,7 +157,7 @@
   </div>
 
   <!-- Scoring -->
-  <div class="section-label">Critères de scoring (note de 1 à 4)</div>
+  <div class="section-label">Critères de scoring — Criticité : 0 à 4 · Licence &amp; Users : 1 à 4</div>
   <div class="criteria-grid" id="criteria-grid"></div>
 
   <!-- Score bar -->
@@ -267,6 +275,10 @@
       const btnVals = isCrit ? [0,1,2,3,4] : [1,2,3,4];
       const d = document.createElement("div");
       d.className = "crit-card";
+      if (isCrit && scores.criticality === 0) {
+        d.style.borderColor = "var(--amber-border)";
+        d.style.background  = "var(--amber-bg)";
+      }
       d.innerHTML = `
         <div class="crit-header">
           <div class="crit-name">${c.label}</div>
@@ -343,10 +355,26 @@
     document.getElementById("score-display").textContent = total;
 
     let decision, badgeClass, rationale;
+    const critZero = scores.criticality === 0;
 
-    if (total < 40) {
-      decision = "JIT recommandé"; badgeClass = "badge-jit";
-      rationale = `<strong>Score faible (${total}/100).</strong> Les critères de criticité et coût ne justifient pas un projet SCIM pour <em>${app}</em>. Orienter vers le JIT avec accompagnement à l'intégration. Réévaluer dans 6 mois si le contexte évolue.`;
+    // Criticité 0 = app non répertoriée par la sécu
+    if (critZero) {
+      if (jitNo) {
+        decision = "Solution alternative proposée"; badgeClass = "badge-alt";
+        rationale = `<strong>Criticité non répertoriée (0) et JIT inadapté.</strong> L'application <em>${app}</em> n'est pas encore classifiée par la sécurité et le JIT ne couvre pas ses besoins. Explorer une solution alternative (API dédiée, webhook, import planifié) et initier en parallèle une classification sécurité avant toute nouvelle évaluation SCIM.`;
+      } else {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Criticité non répertoriée (0).</strong> L'application <em>${app}</em> n'a pas encore été évaluée par la sécurité. Un projet SCIM ne peut pas être instruit sans niveau de criticité défini. Orienter vers le JIT et initier une classification sécurité avant toute nouvelle évaluation.`;
+      }
+
+    } else if (total < 40) {
+      if (jitNo) {
+        decision = "Solution alternative proposée"; badgeClass = "badge-alt";
+        rationale = `<strong>Score faible (${total}/100) et JIT inadapté.</strong> Le JIT ne couvre pas les besoins de <em>${app}</em> et le score ne justifie pas encore un projet SCIM. Explorer une solution alternative : API dédiée, intégration légère (ex : webhook, import CSV planifié) ou retravailler les critères si le contexte évolue.`;
+      } else {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Score faible (${total}/100).</strong> Les critères de criticité et coût ne justifient pas un projet SCIM pour <em>${app}</em>. Orienter vers le JIT avec accompagnement à l'intégration. Réévaluer dans 6 mois si le contexte évolue.`;
+      }
 
     } else if (total < 65) {
       if (!budgetOk) {
@@ -388,19 +416,21 @@
     // Breakdown
     const tbody = document.getElementById("breakdown-table");
     const scoreRows = criteria.map(c => {
-      const pts = Math.round((scores[c.id]/4)*c.weight);
-      const bar = "█".repeat(scores[c.id])+"░".repeat(4-scores[c.id]);
+      const pts = Math.round((scores[c.id]/c.max)*c.weight);
+      const isCrit = c.id === "criticality";
+      const lbl = isCrit ? criticLabels[scores[c.id]] : scoreLabels[scores[c.id]];
+      const filled = scores[c.id]; const total_bars = c.max;
+      const bar = "█".repeat(filled)+"░".repeat(total_bars-filled);
       return `<tr>
         <td>${c.label}</td><td>×${c.weight}</td>
         <td style="font-size:11px;letter-spacing:1px;color:var(--text3)">${bar}</td>
-        <td>${pts} / ${c.weight} pts</td>
+        <td>${pts} / ${c.weight} pts — <span style="color:var(--text3);font-weight:400;font-size:11px">${lbl}</span></td>
       </tr>`;
     }).join("");
 
     const qualMap = {
       budget:{yes:"Oui — validé",no:"Non — bloquant"},
       jit:{yes:"Oui — entièrement",part:"Partiellement",no:"Non"},
-      roadmap:{yes:"Oui — confirmé",part:"À négocier",no:"Non — saturée"},
     };
     const qualRows = qualifiers.map(q => {
       const lbl = qualMap[q.id]?.[qv[q.id]] || qv[q.id];
@@ -430,11 +460,13 @@
     const dd = isScim?"#639922":isBlocked?"#e24b4a":"#ba7517";
 
     const scoreRowsHtml = criteria.map(c => {
-      const pts = Math.round((scores[c.id]/4)*c.weight);
+      const pts = Math.round((scores[c.id]/c.max)*c.weight);
+      const isCrit = c.id === "criticality";
+      const lbl = isCrit ? criticLabels[scores[c.id]] : scoreLabels[scores[c.id]];
       return `<tr>
         <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px">${c.label}</td>
         <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:center;font-size:12px;color:#6b6b65">×${c.weight}</td>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px;font-weight:500;text-align:right">${scores[c.id]} / 4</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px;font-weight:500;text-align:right">${scores[c.id]} / ${c.max} — ${lbl}</td>
         <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:right;font-size:13px;font-weight:500">${pts} / ${c.weight} pts</td>
       </tr>`;
     }).join("");
