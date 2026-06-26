@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outil de décision SCIM vs JIT — Decathlon IAM</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f3; --surface: #ffffff; --surface2: #f0eeeb;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --text: #1a1a18; --text2: #6b6b65; --text3: #9e9e97;
+    --blue-bg:#e6f1fb; --blue-text:#0c447c; --blue-border:#185fa5;
+    --green-bg:#eaf3de; --green-text:#3b6d11; --green-border:#639922;
+    --amber-bg:#faeeda; --amber-text:#854f0b; --amber-border:#ba7517;
+    --red-bg:#fcebeb; --red-text:#a32d2d; --red-border:#e24b4a;
+    --purple-bg:#eeedfe; --purple-text:#3c3489; --purple-border:#534ab7;
+    --radius:12px; --radius-sm:8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#1c1c1a; --surface:#252523; --surface2:#2e2e2b;
+      --border:rgba(255,255,255,0.12); --border2:rgba(255,255,255,0.22);
+      --text:#e8e6e0; --text2:#9e9c96; --text3:#6b6967;
+      --blue-bg:#042c53; --blue-text:#b5d4f4; --blue-border:#378add;
+      --green-bg:#173404; --green-text:#c0dd97; --green-border:#639922;
+      --amber-bg:#412402; --amber-text:#fac775; --amber-border:#ef9f27;
+      --red-bg:#501313; --red-text:#f7c1c1; --red-border:#e24b4a;
+      --purple-bg:#26215c; --purple-text:#cecbf6; --purple-border:#7f77dd;
+    }
+  }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1rem; }
+  .container { max-width:860px; margin:0 auto; }
+
+  /* App field */
+  .app-field { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:1.5rem; display:flex; align-items:center; gap:14px; }
+  .app-field label { font-size:13px; font-weight:500; color:var(--text2); white-space:nowrap; }
+  .app-field input { flex:1; font-size:16px; font-weight:500; font-family:inherit; color:var(--text); background:transparent; border:none; outline:none; border-bottom:1.5px solid var(--border2); padding:4px 0; transition:border-color 0.15s; }
+  .app-field input:focus { border-color:var(--blue-border); }
+  .app-field input::placeholder { color:var(--text3); font-weight:400; font-size:14px; }
+  .badge-tribe { font-size:12px; padding:4px 12px; border-radius:20px; background:var(--blue-bg); color:var(--blue-text); border:0.5px solid var(--blue-border); white-space:nowrap; flex-shrink:0; }
+
+  .page-header { margin-bottom:1.5rem; }
+  .page-header h1 { font-size:22px; font-weight:500; color:var(--text); margin-bottom:4px; }
+  .page-header p { font-size:14px; color:var(--text2); line-height:1.5; }
+
+  .section-label { font-size:11px; font-weight:500; letter-spacing:0.07em; text-transform:uppercase; color:var(--text3); margin-bottom:12px; }
+
+  /* Criteria grid — 3 cols */
+  .criteria-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1.5rem; }
+  @media (max-width:640px) { .criteria-grid { grid-template-columns:1fr; } }
+
+  .crit-card { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:16px; transition:border-color 0.15s; }
+  .crit-card:hover { border-color:var(--border2); }
+  .crit-header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
+  .crit-name { font-size:13px; font-weight:500; color:var(--text); line-height:1.35; }
+  .crit-weight { font-size:11px; color:var(--text2); background:var(--surface2); border-radius:4px; padding:2px 7px; white-space:nowrap; flex-shrink:0; border:0.5px solid var(--border); }
+  .crit-desc { font-size:11px; color:var(--text3); line-height:1.45; margin-bottom:10px; }
+  .score-row { display:flex; align-items:center; gap:8px; }
+  .score-btns { display:flex; gap:4px; }
+  .score-btn { width:32px; height:32px; border:0.5px solid var(--border2); border-radius:var(--radius-sm); background:var(--surface); color:var(--text2); font-size:13px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .score-btn:hover { background:var(--surface2); }
+  .score-btn.active { background:var(--purple-bg); border-color:var(--purple-border); color:var(--purple-text); font-weight:500; }
+  .score-label { font-size:12px; color:var(--text3); }
+  .contrib-line { margin-top:8px; font-size:11px; color:var(--text3); text-align:right; }
+  .contrib-line span { color:var(--text2); font-weight:500; }
+
+  /* Score bar */
+  .score-bar-wrap { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:20px 24px; margin-bottom:1.5rem; }
+  .score-bar-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .score-bar-value { font-size:28px; font-weight:500; color:var(--text); }
+  .score-bar-max { font-size:13px; color:var(--text3); }
+  .score-bar-zones { position:relative; height:10px; border-radius:5px; overflow:hidden; background:var(--surface2); margin-bottom:6px; }
+  .score-bar-fill { height:100%; border-radius:5px; transition:width 0.4s ease, background-color 0.4s; }
+  .score-bar-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--text3); }
+
+  /* Qualifiers — shown after score, contextual */
+  .qual-section { margin-bottom:1.5rem; }
+  .qual-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:540px) { .qual-grid { grid-template-columns:1fr; } }
+  .qual-card {
+    background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px; transition:border-color 0.15s, background 0.15s;
+    display:flex; flex-direction:column; justify-content:space-between; min-height:130px;
+  }
+  .qual-card.q-red    { border-color:var(--red-border);   background:var(--red-bg); }
+  .qual-card.q-amber  { border-color:var(--amber-border); background:var(--amber-bg); }
+  .qual-card.q-green  { border-color:var(--green-border); background:var(--green-bg); }
+  .qual-name { font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; }
+  .qual-desc { font-size:11px; color:var(--text3); line-height:1.45; margin-bottom:14px; flex:1; }
+  .qual-btns { display:flex; gap:8px; }
+  .qual-btn {
+    flex:1; padding:9px 12px; border:0.5px solid var(--border2); border-radius:var(--radius-sm);
+    background:var(--surface); color:var(--text2); font-size:13px; font-family:inherit;
+    cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap;
+  }
+  .qual-btn:hover { background:var(--surface2); }
+  .qual-btn.q-active-yes  { background:var(--green-bg);  border-color:var(--green-border); color:var(--green-text);  font-weight:600; }
+  .qual-btn.q-active-no   { background:var(--red-bg);    border-color:var(--red-border);   color:var(--red-text);    font-weight:600; }
+  .qual-btn.q-active-part { background:var(--amber-bg);  border-color:var(--amber-border); color:var(--amber-text);  font-weight:600; }
+
+  /* Result */
+  .result-panel { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:1.5rem; }
+  .result-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:12px; }
+  .result-score-label { font-size:12px; color:var(--text2); margin-bottom:4px; }
+  .result-score { font-size:36px; font-weight:500; color:var(--text); line-height:1; }
+  .result-badge { font-size:14px; font-weight:500; padding:8px 20px; border-radius:var(--radius-sm); white-space:nowrap; }
+  .badge-scim { background:var(--green-bg);  color:var(--green-text);  border:0.5px solid var(--green-border); }
+  .badge-jit  { background:var(--amber-bg);  color:var(--amber-text);  border:0.5px solid var(--amber-border); }
+  .badge-no   { background:var(--red-bg);    color:var(--red-text);    border:0.5px solid var(--red-border); }
+  .badge-alt  { background:var(--purple-bg); color:var(--purple-text); border:0.5px solid var(--purple-border); }
+
+  .progress-track { height:8px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:8px; }
+  .progress-fill  { height:100%; border-radius:4px; transition:width 0.35s ease, background-color 0.35s; }
+  .fill-scim { background:#1D9E75; } .fill-jit { background:#BA7517; } .fill-no { background:#E24B4A; } .fill-alt { background:#534AB7; }
+
+  .thresholds-row { display:flex; gap:16px; font-size:11px; color:var(--text3); margin-bottom:16px; flex-wrap:wrap; }
+  .thr-item { display:flex; align-items:center; gap:5px; }
+  .thr-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+  .rationale-box { background:var(--surface2); border-radius:var(--radius-sm); padding:14px 16px; font-size:13px; color:var(--text2); line-height:1.6; border-left:3px solid var(--border2); }
+  .rationale-box strong { color:var(--text); font-weight:500; }
+
+  /* Breakdown */
+  .breakdown { margin-top:1.5rem; background:var(--surface); border:0.5px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .breakdown-header { padding:12px 16px; background:var(--surface2); border-bottom:0.5px solid var(--border); font-size:12px; font-weight:500; color:var(--text2); }
+  .breakdown table { width:100%; border-collapse:collapse; font-size:13px; }
+  .breakdown tr:not(:last-child) td { border-bottom:0.5px solid var(--border); }
+  .breakdown td { padding:10px 16px; color:var(--text); }
+  .breakdown td:nth-child(2) { color:var(--text2); text-align:center; }
+  .breakdown td:nth-child(3) { text-align:center; }
+  .breakdown td:last-child   { text-align:right; font-weight:500; }
+  .breakdown tfoot td { font-weight:500; background:var(--surface2); border-top:0.5px solid var(--border2) !important; }
+
+  /* Actions */
+  .actions-row { display:flex; justify-content:flex-end; margin-top:1.5rem; gap:10px; }
+  .btn-reset  { font-size:13px; font-family:inherit; padding:8px 18px; border:0.5px solid var(--border2); border-radius:var(--radius-sm); background:var(--surface); color:var(--text2); cursor:pointer; transition:background 0.15s; }
+  .btn-reset:hover { background:var(--surface2); }
+  .btn-export { font-size:13px; font-family:inherit; padding:8px 18px; border:0.5px solid var(--blue-border); border-radius:var(--radius-sm); background:var(--blue-bg); color:var(--blue-text); cursor:pointer; font-weight:500; transition:opacity 0.15s; }
+  .btn-export:hover { opacity:0.85; }
+
+  .footer { margin-top:2.5rem; padding-top:1rem; border-top:0.5px solid var(--border); font-size:11px; color:var(--text3); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="page-header">
+    <h1>Outil de décision SCIM vs JIT</h1>
+    <p>Note les 3 critères, réponds aux questions qualificatives — la décision suit la logique du diagramme de décision IAM.</p>
+  </div>
+
+  <div class="app-field">
+    <label>Application</label>
+    <input type="text" id="app-name" placeholder="Nom de l'application (ex : Workday, ServiceNow…)" oninput="updateAppName()" autocomplete="off" spellcheck="false"/>
+    <div class="badge-tribe">Decathlon · Tribe IAM</div>
+  </div>
+
+  <!-- Scoring -->
+  <div class="section-label">Critères de scoring — Criticité : 0 à 4 · Licence &amp; Users : 1 à 4</div>
+  <div class="criteria-grid" id="criteria-grid"></div>
+
+  <!-- Score bar -->
+  <div class="score-bar-wrap">
+    <div class="score-bar-top">
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:2px">Score pondéré</div>
+        <span class="score-bar-value" id="score-display">—</span>
+        <span class="score-bar-max"> / 100</span>
+      </div>
+      <div style="font-size:12px;color:var(--text3);text-align:right;line-height:1.8">
+        <span style="color:#E24B4A">■</span> &lt;40 JIT direct<br>
+        <span style="color:#BA7517">■</span> 40–64 selon qualificatifs<br>
+        <span style="color:#1D9E75">■</span> ≥65 vers SCIM
+      </div>
+    </div>
+    <div class="progress-track"><div class="progress-fill fill-jit" id="score-bar-fill" style="width:0%"></div></div>
+    <div class="score-bar-labels"><span>0</span><span>40</span><span>65</span><span>100</span></div>
+  </div>
+
+  <!-- Qualifiers -->
+  <div class="qual-section">
+    <div class="section-label">Questions qualificatives (hors scoring)</div>
+    <div class="qual-grid" id="qual-grid"></div>
+  </div>
+
+  <!-- Result -->
+  <div class="section-label" id="result-label">Résultat</div>
+  <div class="result-panel">
+    <div class="result-top">
+      <div>
+        <div class="result-score-label">Décision finale</div>
+        <div class="result-score" id="result-score">—</div>
+      </div>
+      <div class="result-badge badge-jit" id="result-badge">—</div>
+    </div>
+    <div class="rationale-box" id="rationale">—</div>
+  </div>
+
+  <div class="breakdown">
+    <div class="breakdown-header">Détail du scoring</div>
+    <table id="breakdown-table"></table>
+  </div>
+
+  <div class="actions-row">
+    <button class="btn-reset" onclick="resetAll()">↺ Réinitialiser</button>
+    <button class="btn-export" onclick="exportPDF()">⬇ Exporter la fiche PDF</button>
+  </div>
+
+  <div class="footer">
+    <span>Decathlon · Digital Workspace / Authentication &amp; Access (IAM)</span>
+    <span id="footer-date"></span>
+  </div>
+</div>
+
+<script>
+  document.getElementById("footer-date").textContent = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
+
+  // ── Critères de scoring ──
+  // Criticité : 0 (non répertoriée sécu) à 4
+  // Coût licence : 1 à 4
+  // Nb users : 1 à 4
+  const criteria = [
+    { id:"criticality", label:"Criticité de l'application", weight:40, min:0, max:4, desc:"Niveau de criticité défini par la sécurité. 0 = non répertoriée, 1 = faible, 4 = critique." },
+    { id:"license",     label:"Coût de la licence",         weight:35, min:1, max:4, desc:"Coût unitaire de la licence — plus il est élevé, plus le ROI de la désactivation automatique est fort." },
+    { id:"users",       label:"Nombre d'utilisateurs",      weight:25, min:1, max:4, desc:"Volume d'utilisateurs concernés — grand nombre = ROI du provisioning automatique plus important." },
+  ];
+
+  // ── Qualificatifs (hors score) ──
+  const qualifiers = [
+    {
+      id:"budget", label:"Budget pris en charge ?",
+      desc:"L'app owner porte-t-il le budget SCIM dans son projet ?",
+      opts:[
+        {v:"yes", label:"Oui", cls:"q-active-yes"},
+        {v:"no",  label:"Non", cls:"q-active-no"},
+      ]
+    },
+    {
+      id:"jit", label:"JIT répond au besoin ?",
+      desc:"Le Just-In-Time couvre-t-il les cas d'usage de l'app ?",
+      opts:[
+        {v:"yes",  label:"Oui — entièrement", cls:"q-active-yes"},
+        {v:"part", label:"Partiellement",      cls:"q-active-part"},
+        {v:"no",   label:"Non",                cls:"q-active-no"},
+      ]
+    },
+  ];
+
+  // Labels par critère — criticité a 0, les autres commencent à 1
+  const criticLabels = {0:"Non répertoriée",1:"Faible",2:"Modérée",3:"Élevée",4:"Critique"};
+  const scoreLabels  = {1:"Faible",2:"Moyen",3:"Élevé",4:"Très élevé"};
+
+  const scores = {}; scores.criticality = 0; scores.license = 2; scores.users = 2;
+  const qv = {budget:"yes", jit:"part"};
+
+  function calcTotal() {
+    let t = 0;
+    criteria.forEach(c => t += (scores[c.id] / c.max) * c.weight);
+    return Math.round(t);
+  }
+
+  function updateAppName() {
+    const name = document.getElementById("app-name").value.trim();
+    document.getElementById("result-label").textContent = name ? "Résultat — "+name : "Résultat";
+  }
+
+  function renderCriteria() {
+    const grid = document.getElementById("criteria-grid");
+    grid.innerHTML = "";
+    criteria.forEach(c => {
+      const contrib = Math.round((scores[c.id]/c.max)*c.weight);
+      const isCrit  = c.id === "criticality";
+      const lblMap  = isCrit ? criticLabels : scoreLabels;
+      const btnVals = isCrit ? [0,1,2,3,4] : [1,2,3,4];
+      const d = document.createElement("div");
+      d.className = "crit-card";
+      if (isCrit && scores.criticality === 0) {
+        d.style.borderColor = "var(--amber-border)";
+        d.style.background  = "var(--amber-bg)";
+      }
+      d.innerHTML = `
+        <div class="crit-header">
+          <div class="crit-name">${c.label}</div>
+          <div class="crit-weight">×${c.weight}</div>
+        </div>
+        <div class="crit-desc">${c.desc}</div>
+        <div class="score-row">
+          <div class="score-btns">
+            ${btnVals.map(v=>`<button class="score-btn${scores[c.id]===v?' active':''}" onclick="setScore('${c.id}',${v})" title="${lblMap[v]}">${v}</button>`).join("")}
+          </div>
+          <span class="score-label">${lblMap[scores[c.id]]}</span>
+        </div>
+        <div class="contrib-line">Contribution : <span>${contrib} / ${c.weight} pts</span></div>`;
+      grid.appendChild(d);
+    });
+  }
+
+  function renderQualifiers() {
+    const grid = document.getElementById("qual-grid");
+    grid.innerHTML = "";
+    qualifiers.forEach(q => {
+      const v = qv[q.id];
+      let cardCls = "qual-card";
+      if (q.id==="budget"  && v==="no")   cardCls += " q-red";
+      if (q.id==="jit"     && v==="yes")  cardCls += " q-amber";
+      if (q.id==="roadmap" && v==="no")   cardCls += " q-amber";
+      if (q.id==="jit"     && v==="no")   cardCls += " q-green";
+      const d = document.createElement("div");
+      d.className = cardCls;
+      d.innerHTML = `
+        <div class="qual-name">${q.label}</div>
+        <div class="qual-desc">${q.desc}</div>
+        <div class="qual-btns">
+          ${q.opts.map(o=>`<button class="qual-btn${v===o.v?' '+o.cls:''}" onclick="setQual('${q.id}','${o.v}')">${o.label}</button>`).join("")}
+        </div>`;
+      grid.appendChild(d);
+    });
+  }
+
+  function setScore(id,v){ scores[id]=v; renderCriteria(); renderResult(); }
+  function setQual(id,v) { qv[id]=v;    renderQualifiers(); renderResult(); }
+
+  function resetAll() {
+    scores.criticality = 0; scores.license = 2; scores.users = 2;
+    qv.budget="yes"; qv.jit="part";
+    document.getElementById("app-name").value="";
+    updateAppName(); renderCriteria(); renderQualifiers(); renderResult();
+  }
+
+  // ── Logique de décision — fidèle au diagramme Miro ──
+  // score < 40  → JIT direct (score trop faible, pas de question)
+  // score 40–64 → Budget ? Non → Non recevable
+  //                         Oui → JIT=Oui → JIT couvert
+  //                               JIT=Partiel → JIT recommandé
+  //                               JIT=Non → Solution alternative (score insuffisant pour SCIM)
+  // score ≥ 65  → Budget ? Non → Non recevable
+  //                         Oui → JIT=Oui → JIT couvert
+  //                               JIT=Partiel → JIT recommandé
+  //                               JIT=Non → SCIM validé
+
+  function renderResult() {
+    const total = calcTotal();
+    const app = document.getElementById("app-name").value.trim() || "cette application";
+    const budgetOk  = qv.budget  === "yes";
+    const jitFull   = qv.jit     === "yes";
+    const jitPart   = qv.jit     === "part";
+    const jitNo     = qv.jit     === "no";
+
+    // Score bar color
+    const barColor = total >= 65 ? "#1D9E75" : total >= 40 ? "#BA7517" : "#E24B4A";
+    const fill = document.getElementById("score-bar-fill");
+    fill.style.width = total+"%";
+    fill.style.background = barColor;
+    document.getElementById("score-display").textContent = total;
+
+    let decision, badgeClass, rationale;
+    const critZero = scores.criticality === 0;
+
+    // Criticité 0 = app non répertoriée par la sécu
+    if (critZero) {
+      if (jitNo) {
+        decision = "Solution alternative proposée"; badgeClass = "badge-alt";
+        rationale = `<strong>Criticité non répertoriée (0) et JIT inadapté.</strong> L'application <em>${app}</em> n'est pas encore classifiée par la sécurité et le JIT ne couvre pas ses besoins. Explorer une solution alternative (API dédiée, webhook, import planifié) et initier en parallèle une classification sécurité avant toute nouvelle évaluation SCIM.`;
+      } else {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Criticité non répertoriée (0).</strong> L'application <em>${app}</em> n'a pas encore été évaluée par la sécurité. Un projet SCIM ne peut pas être instruit sans niveau de criticité défini. Orienter vers le JIT et initier une classification sécurité avant toute nouvelle évaluation.`;
+      }
+
+    } else if (total < 40) {
+      if (jitNo) {
+        decision = "Solution alternative proposée"; badgeClass = "badge-alt";
+        rationale = `<strong>Score faible (${total}/100) et JIT inadapté.</strong> Le JIT ne couvre pas les besoins de <em>${app}</em> et le score ne justifie pas encore un projet SCIM. Explorer une solution alternative : API dédiée, intégration légère (ex : webhook, import CSV planifié) ou retravailler les critères si le contexte évolue.`;
+      } else {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Score faible (${total}/100).</strong> Les critères de criticité et coût ne justifient pas un projet SCIM pour <em>${app}</em>. Orienter vers le JIT avec accompagnement à l'intégration. Réévaluer dans 6 mois si le contexte évolue.`;
+      }
+
+    } else if (total < 65) {
+      if (!budgetOk) {
+        decision = "Demande non recevable"; badgeClass = "badge-no";
+        rationale = `<strong>🚫 Budget non pris en charge.</strong> Malgré un score intermédiaire (${total}/100), la demande SCIM pour <em>${app}</em> ne peut pas être instruite sans budget validé. Retourner la demande à l'app owner avant toute démarche technique.`;
+      } else if (jitFull) {
+        decision = "JIT — besoin couvert"; badgeClass = "badge-jit";
+        rationale = `<strong>JIT répond entièrement au besoin.</strong> Score intermédiaire (${total}/100) et JIT suffisant pour <em>${app}</em>. Un SCIM n'est pas justifié. Proposer un accompagnement JIT.`;
+      } else if (jitPart) {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Score intermédiaire (${total}/100) — JIT partiel.</strong> Le JIT couvre partiellement le besoin de <em>${app}</em>. Score insuffisant pour valider un SCIM. Démarrer avec le JIT et réévaluer dans 6 mois.`;
+      } else {
+        decision = "Solution alternative proposée"; badgeClass = "badge-alt";
+        rationale = `<strong>Score insuffisant pour un SCIM (${total}/100) et JIT inadapté.</strong> Le JIT ne couvre pas les besoins de <em>${app}</em> mais le score ne justifie pas encore un projet SCIM. Explorer une solution alternative : API dédiée, intégration légère (ex : webhook, import CSV planifié) ou réévaluer les critères si le contexte évolue.`;
+      }
+
+    } else {
+      if (!budgetOk) {
+        decision = "Demande non recevable"; badgeClass = "badge-no";
+        rationale = `<strong>🚫 Budget non pris en charge.</strong> Le score est élevé (${total}/100) mais la demande SCIM pour <em>${app}</em> est bloquée faute de budget validé. Retourner la demande à l'app owner pour validation budgétaire.`;
+      } else if (jitFull) {
+        decision = "JIT — besoin couvert"; badgeClass = "badge-jit";
+        rationale = `<strong>JIT répond entièrement au besoin.</strong> Malgré un score élevé (${total}/100), le JIT couvre intégralement les cas d'usage de <em>${app}</em>. SCIM non nécessaire à ce stade. Réévaluer si la volumétrie augmente.`;
+      } else if (jitPart) {
+        decision = "JIT recommandé"; badgeClass = "badge-jit";
+        rationale = `<strong>Score élevé (${total}/100) — JIT partiel.</strong> Le JIT couvre partiellement le besoin de <em>${app}</em>. Démarrer avec le JIT et planifier le SCIM dans la prochaine roadmap IA.`;
+      } else {
+        decision = "SCIM validé ✓"; badgeClass = "badge-scim";
+        rationale = `<strong>SCIM recommandé (${total}/100).</strong> Tous les critères sont réunis pour <em>${app}</em> : criticité, volumétrie, budget validé et JIT insuffisant. Lancer la qualification technique avec l'app owner et planifier l'intégration dans la roadmap IA.`;
+      }
+    }
+
+    document.getElementById("result-score").textContent = decision;
+    const badge = document.getElementById("result-badge");
+    badge.textContent = decision;
+    badge.className = "result-badge "+badgeClass;
+    document.getElementById("rationale").innerHTML = rationale;
+
+    // Breakdown
+    const tbody = document.getElementById("breakdown-table");
+    const scoreRows = criteria.map(c => {
+      const pts = Math.round((scores[c.id]/c.max)*c.weight);
+      const isCrit = c.id === "criticality";
+      const lbl = isCrit ? criticLabels[scores[c.id]] : scoreLabels[scores[c.id]];
+      const filled = scores[c.id]; const total_bars = c.max;
+      const bar = "█".repeat(filled)+"░".repeat(total_bars-filled);
+      return `<tr>
+        <td>${c.label}</td><td>×${c.weight}</td>
+        <td style="font-size:11px;letter-spacing:1px;color:var(--text3)">${bar}</td>
+        <td>${pts} / ${c.weight} pts — <span style="color:var(--text3);font-weight:400;font-size:11px">${lbl}</span></td>
+      </tr>`;
+    }).join("");
+
+    const qualMap = {
+      budget:{yes:"Oui — validé",no:"Non — bloquant"},
+      jit:{yes:"Oui — entièrement",part:"Partiellement",no:"Non"},
+    };
+    const qualRows = qualifiers.map(q => {
+      const lbl = qualMap[q.id]?.[qv[q.id]] || qv[q.id];
+      const flag = (q.id==="budget"&&qv.budget==="no") ? ` <span style="color:var(--red-text);font-size:11px">🚫</span>`
+        : (q.id==="jit"&&qv.jit==="yes") ? ` <span style="color:var(--amber-text);font-size:11px">⚠</span>` : "";
+      return `<tr>
+        <td style="color:var(--text2)">${q.label}${flag}</td>
+        <td style="color:var(--text3);text-align:center">—</td><td></td>
+        <td style="color:var(--text2);text-align:right;font-weight:400">${lbl}</td>
+      </tr>`;
+    }).join("");
+
+    tbody.innerHTML = `<tbody>${scoreRows}${qualRows}</tbody>
+      <tfoot><tr><td colspan="2">Total pondéré</td><td></td><td>${total} / 100 pts</td></tr></tfoot>`;
+  }
+
+  // ── Export PDF ──
+  function exportPDF() {
+    const appName  = document.getElementById("app-name").value.trim() || "Application";
+    const decision = document.getElementById("result-badge").textContent;
+    const rationale = document.getElementById("rationale").innerHTML;
+    const date = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
+    const total = calcTotal();
+    const isScim = decision.includes("SCIM"), isBlocked = decision.includes("recevable");
+    const dc = isScim?"#3b6d11":isBlocked?"#a32d2d":"#854f0b";
+    const db = isScim?"#eaf3de":isBlocked?"#fcebeb":"#faeeda";
+    const dd = isScim?"#639922":isBlocked?"#e24b4a":"#ba7517";
+
+    const scoreRowsHtml = criteria.map(c => {
+      const pts = Math.round((scores[c.id]/c.max)*c.weight);
+      const isCrit = c.id === "criticality";
+      const lbl = isCrit ? criticLabels[scores[c.id]] : scoreLabels[scores[c.id]];
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px">${c.label}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:center;font-size:12px;color:#6b6b65">×${c.weight}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px;font-weight:500;text-align:right">${scores[c.id]} / ${c.max} — ${lbl}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:right;font-size:13px;font-weight:500">${pts} / ${c.weight} pts</td>
+      </tr>`;
+    }).join("");
+
+    const qualMap = {budget:{yes:"Oui — validé",no:"Non — bloquant"},jit:{yes:"Oui — entièrement",part:"Partiellement",no:"Non"},roadmap:{yes:"Oui — confirmé",part:"À négocier",no:"Non — saturée"}};
+    const qualRowsHtml = qualifiers.map(q => {
+      const lbl = qualMap[q.id]?.[qv[q.id]]||qv[q.id];
+      const isBad = (q.id==="budget"&&qv.budget==="no")||(q.id==="jit"&&qv.jit==="yes");
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;font-size:13px;color:#6b6b65">${q.label}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:center;font-size:12px;color:#9e9e97">—</td><td></td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #e0ddd6;text-align:right;font-size:13px;color:${isBad?"#a32d2d":"#6b6b65"}">${lbl}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Fiche SCIM — ${appName}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#fff;color:#1a1a18;padding:32px 40px;font-size:13px}
+@media print{body{padding:20px 28px}.no-print{display:none}}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:1.5px solid #1a1a18}
+.hdr h1{font-size:20px;font-weight:600;margin-bottom:4px}.hdr p{font-size:12px;color:#6b6b65}
+.hdr-r{text-align:right;font-size:11px;color:#6b6b65;line-height:1.6}
+.dec-row{display:flex;justify-content:space-between;align-items:center;background:#f5f5f3;border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.dec-score{font-size:11px;color:#6b6b65;margin-bottom:4px}.dec-val{font-size:28px;font-weight:600}
+.badge{display:inline-block;padding:6px 16px;border-radius:6px;font-size:14px;font-weight:600;background:${db};color:${dc};border:1px solid ${dd}}
+.rat{background:#f5f5f3;border-left:3px solid #b4b2a9;border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#3d3d3a;line-height:1.6}
+.rat strong{color:#1a1a18}.sec{font-size:10px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:#9e9e97;margin:20px 0 10px}
+table{width:100%;border-collapse:collapse}thead td{font-size:11px;color:#9e9e97;padding:6px 12px;border-bottom:1px solid #d3d1c7}
+tfoot td{font-size:13px;font-weight:600;padding:10px 12px;background:#f5f5f3;border-top:1px solid #888780}
+.pbtn{margin-top:24px;padding:9px 20px;background:#e6f1fb;color:#0c447c;border:1px solid #185fa5;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+</style></head><body>
+<div class="hdr">
+  <div><h1>Fiche de décision SCIM / JIT</h1><p>Decathlon · Digital Workspace / Authentication &amp; Access (IAM)</p></div>
+  <div class="hdr-r"><strong style="font-size:14px">${appName}</strong><br>Évalué le ${date}</div>
+</div>
+<div class="dec-row">
+  <div><div class="dec-score">Score pondéré</div><div class="dec-val">${total} / 100</div></div>
+  <div class="badge">${decision}</div>
+</div>
+<div class="rat">${rationale}</div>
+<div class="sec">Détail du scoring</div>
+<table>
+  <thead><tr><td>Critère</td><td style="text-align:center">Coeff.</td><td style="text-align:right">Note</td><td style="text-align:right">Points</td></tr></thead>
+  <tbody>${scoreRowsHtml}${qualRowsHtml}</tbody>
+  <tfoot><tr><td colspan="2">Total pondéré</td><td></td><td style="text-align:right">${total} / 100 pts</td></tr></tfoot>
+</table>
+<button class="pbtn no-print" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+</body></html>`;
+
+    const win = window.open("","_blank","width=800,height=900");
+    win.document.write(html); win.document.close(); win.focus();
+  }
+
+  // Init
+  renderCriteria(); renderQualifiers(); renderResult();
+</script>
+</body>
+</html>
